@@ -2,6 +2,7 @@ var proc = require('child_process');
 var fs = require("fs");
 var url = require("url");
 var querystring = require("querystring");
+const { pamAuthenticate, pamErrors } = require('node-linux-pam');
 
 module.exports = {
 	
@@ -11,8 +12,6 @@ module.exports = {
 	settingsDir: "/etc/iptables/config.json",
 	_settings: {
 		savePath: "/etc/iptables/rules.save",
-		user: "admin",
-		pass: "",
 		theme: "Silver",
 		themes: []
 	},
@@ -202,19 +201,33 @@ module.exports = {
 			});
 			req.on('end', function () {
 				var post = querystring.parse(body);
-				var login = post['login'];
-				var pass = post['pass'];
 
-				var auth = login === module.exports._settings.user && pass === module.exports._settings.pass;
-				if(auth) {
-					var ip = req.connection.remoteAddress;
-					module.exports.authUsers[ip] = 1;
-					res.writeHead(301, {"Location": "/"});
-					res.end();
-				}
-				else {
+				const options = {
+					username: post['login'],
+					password: post['pass'],
+				};
+
+				pamAuthenticate(options, (err, code) => {
+					if (!err) {
+						console.log('Authenticated!');
+
+						var ip = req.connection.remoteAddress;
+						module.exports.authUsers[ip] = 1;
+
+						res.writeHead(301, {"Location": "/"});
+						res.end();
+						return;
+					}
+
+					console.log(err, code);
 					res.end("Error!");
-				}
+				});
+
+
+
+
+
+
 			});
 		}
 		else {
