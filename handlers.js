@@ -12,6 +12,8 @@ module.exports = {
 	settingsDir: "/etc/iptables/config.json",
 	_settings: {
 		savePath: "/etc/iptables/rules.save",
+		user: "pam",
+		pass: "",
 		theme: "Silver",
 		themes: []
 	},
@@ -201,33 +203,42 @@ module.exports = {
 			});
 			req.on('end', function () {
 				var post = querystring.parse(body);
+				var login = post['login'];
+				var pass = post['pass'];
 
 				const options = {
-					username: post['login'],
-					password: post['pass'],
+					username: login,
+					password: pass,
 				};
-
-				pamAuthenticate(options, (err, code) => {
-					if (!err) {
-						console.log('Authenticated!');
-
+				
+				if(  module.exports._settings.user === "pam" ){
+					pamAuthenticate(options, (err, code) => {
+						if (!err) {
+							console.log('Authenticated!');
+	
+							var ip = req.connection.remoteAddress;
+							module.exports.authUsers[ip] = 1;
+	
+							res.writeHead(301, {"Location": "/"});
+							res.end();
+							return;
+						}
+	
+						console.log(err, code);
+						res.end("Error!");
+					});
+				}else{
+					var auth = login === module.exports._settings.user && pass === module.exports._settings.pass;
+					if(auth) {
 						var ip = req.connection.remoteAddress;
 						module.exports.authUsers[ip] = 1;
-
 						res.writeHead(301, {"Location": "/"});
 						res.end();
-						return;
 					}
-
-					console.log(err, code);
-					res.end("Error!");
-				});
-
-
-
-
-
-
+					else {
+						res.end("Error!");
+					}
+				}
 			});
 		}
 		else {
